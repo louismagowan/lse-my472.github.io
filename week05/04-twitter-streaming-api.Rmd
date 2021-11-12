@@ -14,7 +14,6 @@ library("rtweet")
 library("tidyverse")
 library("maps")
 library("stringr")
-library("maps")
 
 # Function which allows to recover corrupted tweet jsons returned by rtweet
 # Discussion: https://github.com/ropensci/rtweet/issues/356
@@ -26,15 +25,15 @@ source("https://gist.githubusercontent.com/JBGruber/dee4c44e7d38d537426f57ba1e4f
 First, we need to authenticate. After your application has been approved, you can paste the consumer key, consumer secret, access token, and access token secret strings into the list below:
 
 ```{r}
-authentication <- list(consumer_key = "CONSUMER_KEY",
-                 consumer_secret = "CONSUMER_SECRET",
-                 access_token = "ACCESS_TOKEN",
-                 access_token_secret = "ACCESS_TOKEN_SECRET")
+authentication <- list(consumer_key = "6lg7sR2q9QuUbEs0oC1JCFp2V",
+                 consumer_secret = "ALSzbmjg61XpAFp2GfItF1bvTdYA03ulpjsgtdHbX7FgVKMdny",
+                 access_token = "627360390-fD5HT41d5BdZAWjjIOT2tVTTYDmPNjM46cqxhSOP",
+                 access_token_secret = "smlS253omv60IkD8tTxjg6qA4kX3abKYZ5ufoGPJ8XEgT")
 ```
 
 A more convenient approach could be to store this list once after you have pasted your keys and then to reload it when running some code. Store the list once with:
 
-```{t}
+```{r}
 save(authentication, file = "authentication.rda")
 ```
 
@@ -54,7 +53,7 @@ twitter_token <- create_token(app = "enter your app name here",
                               access_token = authentication$access_token,
                               access_secret = authentication$access_token_secret)
 
-lookup_users("LSEnews")$screen_name
+lookup_users("louismagowan")$screen_name
 ```
 
 
@@ -83,8 +82,8 @@ sample_tweets <- tryCatch({parse_stream('streamed_tweets.json')},
                            {print(paste("Retrying with alternative function after initial error when parsing file",
                                         'streamed_tweets.json'));
                            return(recover_stream('streamed_tweets.json'))})
-head(____________)
-head(____________$text)
+head(sample_tweets)
+head(sample_tweets$text)
 ```
 
 The returned tweets have been parsed into R directly as a data frame / tibble:
@@ -129,7 +128,7 @@ head(keyword_tweets$text)
 Multiple keywords that should be contained in the tweets are separated with a capitalised `AND` (to indicate that the `and` is not a term itself). For example, let us search for the keywords trump and biden:
 
 ```{r}
-keywords_tweets <- stream_tweets(____, timeout = 5)
+keywords_tweets <- stream_tweets(q = "trump AND biden", timeout = 5)
 head(keywords_tweets$text)
 ```
 
@@ -144,14 +143,14 @@ Lastly, let us turn to collecting tweets filtered by location instead. To be abl
 For example, imagine we want to collect tweets from the United States. One way to do it is to find two pairs of coordinates (longitude and latitude) that indicate the southwest corner AND the northeast corner to create a large rectangular* boundary encompassing the country. One important thing when using this function is to note the order it uses: It is not (lat, long), but (long, lat). In the case of the US, this would therefore be approx. (-125, 26) and (-65, 49) or in one vector c(-125, 26, -65, 49). How can you find coordinates? You can e.g. use Google Maps, and right-click on the desired location (e.g. the north-east corner of the US or a city) and select "What's here?". Just note that the coordinates on Google are given in opposite order. As a small exercise, what are the approximate coordinates of Detroit's center? Alternatively you can use the function `lookup_coords`, e.g.` lookup_coords("usa")`. If you would like to look up coordinates of e.g. cities with this functions you would need to supply a valid Google Maps API key as one of its arguments. Proceeding with the example of US tweets:
 
 ```{r}
-stream_tweets(q = _____________, timeout = 30, file_name='__________________')
+# stream_tweets(q = c(-83.07413807822492, 42.3721877949165, -83.07840815489244, 42.36865257592395), timeout = 30, file_name='detroit.json')
 #stream_tweets(q = lookup_coords("usa"), timeout = 30, file_name='__________________')
 
-geo_tweets <- tryCatch({parse_stream('__________________')},
+geo_tweets <- tryCatch({parse_stream('test_jsons/streamed_geo_tweets.json')},
                        error = function(e)
                            {print(paste("Retrying with alternative function after initial error when parsing file",
-                                        '__________________'));
-                           return(recover_stream('__________________'))})
+                                        'test_jsons/streamed_geo_tweets.json'));
+                           return(recover_stream('test_jsons/streamed_geo_tweets.json'))})
 ```
 
 Where are these tweets from more precisely? We can use the **maps** package to visualise this. In the `map.where` function we can thereby e.g. use "state" as the first argument to obtain location of tweets at the state level or "world" to obtain location at the country level. To do this, however, we first need to add columns to our data frame that store the latitude and longitude of each tweet. The `lat_lng` function appends the data frame with latitude and longitude variables using available geo-location information in tweet data returned from the API. For in detail information of what types of location data can be attached to geo-tagged tweets, see e.g. this [link](https://developer.twitter.com/en/docs/twitter-api/v1/data-dictionary/overview/geo-objects)
@@ -162,8 +161,9 @@ Where are these tweets from more precisely? We can use the **maps** package to v
 geo_tweets <- lat_lng(geo_tweets)
 
 # Counting how many tweets came from different US states
-states <- map.where(database = "state", x = geo_tweets$____, y = geo_tweets$____)
+states <- map.where(database = "state", x = geo_tweets$lng, y = geo_tweets$lat)
 head(sort(table(states), decreasing = TRUE))
+
 ```
 
 We can also create a map visualising the exact locations of the tweets within states:
@@ -175,13 +175,13 @@ map.data <- map_data("state")
 
 ## And we use ggplot2 to draw the map:
 # Map base
-ggplot(map.data) + geom_map(aes(map_id = region), map = map.data, fill = "grey90", 
+p <- ggplot(map.data) + geom_map(aes(map_id = region), map = map.data, fill = "grey90", 
     color = "grey50", size = 0.25) + expand_limits(x = map.data$long, y = map.data$lat) + 
     # Limits for x and y axis
     scale_x_continuous(limits=c(-125, -66)) + scale_y_continuous(limits = c(25, 50)) +
     # Adding the dot for each tweet and specifying dot size, transparency, and colour
-    geom_point(data = geo_tweets, aes(x = lng, y = lat), size = ____,
-               alpha = 1/5, color = ____) +
+    geom_point(data = geo_tweets, aes(x = lng, y = lat), size = 1,
+               alpha = 1/5, color = "red") +
     # Removing unnecessary graph elements
     theme(axis.line = element_blank(), 
     	axis.text = element_blank(), 
@@ -192,4 +192,6 @@ ggplot(map.data) + geom_map(aes(map_id = region), map = map.data, fill = "grey90
         panel.grid.major = element_blank(), 
         panel.grid.minor = element_blank(), 
         plot.background = element_blank()) 
+
+ggplotly(p)
 ```
